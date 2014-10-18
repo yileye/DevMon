@@ -17,4 +17,5 @@ tail /var/tmp/DevMon.log -n 200
 
 #Run at startup
 sudo crontab -u root -e
+#Add to the end of crontab
 @reboot /bin/sleep 30; sudo python /home/pi/DevMon/DevMon.py
