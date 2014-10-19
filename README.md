@@ -11,6 +11,10 @@ cd ~
 
 git clone --depth=1 https://github.com/NateMccomb/DevMon.git
 
+*First Time Installing*
+Rename Config file(This will replace any settings you have saved DevMon.cfg)
+
+cp DevMon.cfg.new DevMon.cfg
 
 
 **Edit Config**
