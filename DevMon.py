@@ -1,4 +1,15 @@
 #!/usr/lib/cgi-bin 
+#############################################################################
+#                                                                           #
+#                DevMon (Ping) V0.2                                         #
+#                                                                           #
+#                                                                           #
+# DevMon will is reloaded the config(DevMon.cfg) at the start of every      #
+#   scan so live changes can be made/saved and then updated.                #
+#                                                                           #
+#                    DevMon Programmer: Nate Mccomb (Nate.Mccomb@gmail.com  #
+#############################################################################
+#
 import os
 import requests
 import time
@@ -13,6 +24,7 @@ from time import sleep
 
 #Var. Setup
 IPList = []
+IPNameList = []
 IPFailed = []
 FailedTime = []
 EmailFailed = []
@@ -26,6 +38,7 @@ EmailFrom = '%s' % (HostName)
 SleepTime = 1
 EmailUser = ''
 EmailPass = ''
+DeviceCount = 0
 
 #setup logger
 LOG_FILENAME = '/var/tmp/DevMon.log'
@@ -95,6 +108,8 @@ def find_element_in_list(element,list_element):
 def OpenConfig(filename):
     UpdateFound = False
     emailadd = None
+    AddDeviceCount = 0
+    global DeviceCount
     #print 'Checking for updates in %s' % (filename)
     
     # Read in Config file line for line
@@ -114,7 +129,7 @@ def OpenConfig(filename):
                             #Return a list of Email addresses to send to
                             UpdateFound = True
                             EmailList = (line[8:])
-                            Print( '    **** Updated - Email (To:) Address: %s' % EmailList)
+                            Print( '    **** Updated - (To:) Email Address(s): %s' % EmailList)
                     #Look for WAIT: in line to update wait to send
                     elif 'WAIT:' in line.upper():
                         global WaitToSend
@@ -124,7 +139,7 @@ def OpenConfig(filename):
                             OldWait = WaitToSend
                             WaitToSend = (line[5:])
                             UpdateFound = True
-                            Print( '    **** Updated - Wait to send failed ping email from %s to %s Sec.' % (OldWait, WaitToSend))
+                            Print( '    **** Updated - Time to wait before sending ping timeout email: from %s to %s Sec.' % (OldWait, WaitToSend))
                     #Look for EmailUser: in line to update SNMP User
                     elif 'EMAILUSER:' in line.upper():
                         global EmailUser
@@ -133,7 +148,7 @@ def OpenConfig(filename):
                                 Print( '*' * 70)
                             EmailUser = (line[10:])
                             UpdateFound = True
-                            Print( '    **** Updated - Email User Name to %s' % (EmailUser))
+                            Print( '    **** Updated - Email User Name Set to: %s' % (EmailUser))
                     #Look for EmailPass: in line to update SNMP User
                     elif 'EMAILPASS:' in line.upper():
                         global EmailPass
@@ -152,17 +167,27 @@ def OpenConfig(filename):
                             OldSleep = SleepTime
                             SleepTime = (line[6:])
                             UpdateFound = True
-                            Print( '    **** Updated - Sleep Time From %s to %s Sec.' % (str(OldSleep).rstrip('\r'),str(SleepTime).rstrip('\r')))
+                            Print( '    **** Updated - Sleep Time: From %s to %s Sec.' % (str(OldSleep).rstrip('\r'),str(SleepTime).rstrip('\r')))
             
                 else:
                     #Look in IPList to see if we have already added IP in 'Line'
+                    IPADD = ''
+                    DeviceCount += 1
+                    AddDeviceCount += 1
+                    IPNAME = 'Device%s' % (DeviceCount)
+                    line = line.split("|")
+                    if len(line) > 0:
+                        IPADD = line[0]
+                    if len(line) > 1:
+                        IPNAME = line[1]
                     
-                    if find_element_in_list(line,IPList) == -1:
+                    if find_element_in_list(IPADD,IPList) == -1:
                         #IP was not found in 'IPList
                         if UpdateFound == False:
                                 Print( '*' * 70)
-                        Print( "    **** Adding :%s" % (line))
-                        IPList.append(line)
+                        Print( "    **** Adding:%-*s **With the Name:%s" % (15,IPADD,IPNAME))
+                        IPList.append(IPADD)
+                        IPNameList.append(IPNAME)
                         global FailedTime
                         IPFailed.append(ScanTime)
                         EmailFailed.append(None)
@@ -171,7 +196,8 @@ def OpenConfig(filename):
                         UpdateFound = True
     
     if UpdateFound == True:
-        Print( '    **** Updates found in %s - Done' % (filename))
+        Print("    **** %d Devices, %d New Devices Added" % (DeviceCount,AddDeviceCount))
+        Print('    **** Updates found in %s - Done' % (filename))
         Print('*' * 70)
     
 
@@ -193,20 +219,29 @@ def send_email(TEXT,STATUS):
             # Prepare actual message
             message = """\From: %s\nTo: %s\nSubject: %s\n\n%s
             """ % (FROM, TO, SUBJECT, TEXT)
+            #add the tail of the log file to the email
+            Tail = '\n\n** Last 30 Lines from Log:\n\n'
+            for line in tail('/var/tmp/DevMon.log','30'):
+                Tail = Tail + '         ' + line
+               
             try:
                 #server = smtplib.SMTP(SERVER) 
-                server = smtplib.SMTP("smtp.gmail.com", 587) 
+                server = smtplib.SMTP("smtp.gmail.com", 587) #or port 465 doesn't seem to work!
                 server.ehlo()
                 server.starttls()
                 server.login(gmail_user, gmail_pwd)
-                server.sendmail(FROM, TO.split(";"), message)
+                server.sendmail(FROM, TO.split(";"), message + Tail)
                 #server.quit()
                 server.close()
                 Print( '               ****   Successfully Sent Email   ****')
             except:
                 Print( '                ****   Failed to Send Email   ****')
 
-
+def tail(f, n):
+  stdin,stdout = os.popen2("tail -n "+n+" "+f)
+  stdin.close()
+  lines = stdout.readlines(); stdout.close()
+  return lines[:]
 
 if __name__ == "__main__":
     while(True):
@@ -225,17 +260,18 @@ if __name__ == "__main__":
                 if IPOnline[find_element_in_list(item,IPList)] != None:
                     # Find if this device has gone offline since DevMon started
                     LastOffLine = ''
+                    
                     if IPFailed[find_element_in_list(item,IPList)] != None and StartTime != IPFailed[find_element_in_list(item,IPList)]:
                         LastoffLine = ' *Went Offline Last @ %s for %s' % (IPFailed[find_element_in_list(item,IPList)],FailedTime[find_element_in_list(item,IPList)])
                     else:
                         LastoffLine = ' '
                     # get the uptime for this device
-                    Print( '%s - Up Time for: %s %s' % ((IPOnline[find_element_in_list(item,IPList)] - IPFailed[find_element_in_list(item,IPList)]), item, LastoffLine))
+                    Print( '%s - Up Time for: %s(%s) %s' % ((IPOnline[find_element_in_list(item,IPList)] - IPFailed[find_element_in_list(item,IPList)]),IPNameList[find_element_in_list(item,IPList)], item, LastoffLine))
                     # this device is now back online so send an online email only if we send an offline email
                     if EmailFailed[find_element_in_list(item,IPList)] == True:
                         Print( '*' * 70)
                         Print( '****        Send Email for %s - Online        ****' % (item))
-                        send_email('%s Is Back Online After %s Sec. of Being Down @ %s '% ((item), (FailedTime[find_element_in_list(item,IPList)]) ,IPOnline[find_element_in_list(item,IPList)]), (" - %s Now Online" % (item)))
+                        send_email('%s(%s) Is Back Online After %s Sec. of Being Down @ %s '% (IPNameList[find_element_in_list(item,IPList)],(item), (FailedTime[find_element_in_list(item,IPList)]) ,IPOnline[find_element_in_list(item,IPList)]), (" - %s Now Online" % (item)))
                         Print( '*' * 70)
                         EmailFailed[find_element_in_list(item,IPList)] = False
                 
@@ -244,13 +280,13 @@ if __name__ == "__main__":
                 IPFailed[find_element_in_list(item,IPList)] = ScanTime
                 if IPFailed[find_element_in_list(item,IPList)] != None:
                     TimeOffLine = (IPFailed[find_element_in_list(item,IPList)] - IPOnline[find_element_in_list(item,IPList)])
-                    Print( '%s - Offline for: %s @ %s' % (item, TimeOffLine, IPOnline[find_element_in_list(item,IPList)]))
+                    Print( '%s(%s) - Offline for: %s @ %s' % (IPNameList[find_element_in_list(item,IPList)],item, TimeOffLine, IPOnline[find_element_in_list(item,IPList)]))
                     FailedTime[find_element_in_list(item,IPList)] = TimeOffLine
                     if datetime.timedelta(seconds=int(WaitToSend)) <=  TimeOffLine and EmailFailed[find_element_in_list(item,IPList)] != True:
                         Print( '*' * 70)
-                        Print( '    **** %s has been offline for more then %s Sec. ****' % (item, WaitToSend))
+                        Print( '    **** %s has been offline for more then %s Sec. ****' % (IPNameList[find_element_in_list(item,IPList)], WaitToSend))
                         Print( '    ****        Send Failed Email for %s          ****' % (item))
-                        send_email('%s Went offline for more then %s Sec. @ %s' % (item, WaitToSend, IPFailed[find_element_in_list(item,IPList)]), " - %s Went Offline" % (item))
+                        send_email('%s(%s) Went offline for more then %s Sec. @ %s' % (IPNameList[find_element_in_list(item,IPList)],item, WaitToSend, IPFailed[find_element_in_list(item,IPList)]), " - %s Went Offline" % (item))
                         Print( '*' * 70)
                         EmailFailed[find_element_in_list(item,IPList)] = True
 
