@@ -12,7 +12,8 @@ git clone --depth=1 https://github.com/NateMccomb/DevMon.git /var/tmp/DevMon
 
 cp /var/tmp/DevMon/ ~/DevMon
 
-**Update DevMon.py Only**This way .cfg doesn't get overridden
+**Update DevMon.py Only** 
+This way .cfg doesn't get overridden
 
 cp /var/tmp/DevMon/ /var/tmp/DevMonOld/
 
