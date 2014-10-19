@@ -5,17 +5,20 @@ DevMon - Device Monitor (Ping)
 
 DevMon can be used to monitor multiple devices by pinging them. If a device goes offline for XX seconds, DevMon will then send an email out to the list of E-Mail addresses. DevMon uses the Gmail SMTP server to send Emails, so a valid Gmail account is required and needs to be added to the .cfg file.
 
-**Install**
-
-cd ~
-
-git clone --depth=1 https://github.com/NateMccomb/DevMon.git
 
 **First Time Installing**
-Rename Config file(This will replace any settings you have saved DevMon.cfg)
 
-cp DevMon.cfg.new DevMon.cfg
+git clone --depth=1 https://github.com/NateMccomb/DevMon.git /var/tmp/DevMon
 
+cp /var/tmp/DevMon/ ~/DevMon
+
+**Update DevMon.py Only**This way .cfg doesn't get overridden
+
+cp /var/tmp/DevMon/ /var/tmp/DevMonOld/
+
+git clone --depth=1 https://github.com/NateMccomb/DevMon.git /var/tmp/DevMon
+
+cp /var/tmp/DevMon/DevMon.py ~/DevMon/
 
 **Edit Config**
 
