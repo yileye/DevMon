@@ -8,6 +8,12 @@ DevMon can be used to monitor multiple devices by pinging them. If a device goes
 
 **First Time Installing**
 
+sudo apt-get update
+
+sudo apt-get upgrade
+
+sudo apt-get install python-requests
+
 git clone --depth=1 https://github.com/NateMccomb/DevMon.git /var/tmp/DevMon
 
 cp /var/tmp/DevMon/ ~/DevMon
